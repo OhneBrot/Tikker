@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Tikker – PWA (tap fix)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="color-scheme" content="light dark">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <style>
+    :root { --maxw: 430px; }
+    html, body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); margin:0; }
+    body { background:#0a0a0a; -webkit-tap-highlight-color: transparent; }
+    @media (prefers-color-scheme: light){ body{ background:#fafafa; } }
+
+    .card{ border-radius: 1.25rem; border:1px solid rgb(228,228,231); background:white; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+    @media (prefers-color-scheme: dark){ .card{ background:#111; border-color:#27272a; } }
+    .field{ border-radius: 1rem; border:1px solid rgb(212,212,216); background:white; }
+    @media (prefers-color-scheme: dark){ .field{ background:#0b0b0b; border-color:#27272a; color:#e5e7eb; } }
+    .muted{ color: #71717a; }
+    @media (prefers-color-scheme: dark){ .muted{ color:#a1a1aa; } }
+    .hiddenView{ display:none; }
+    .tile{ aspect-ratio: 1/1; }
+
+    #app-root{ opacity:0; transform: translateX(24px); transition: transform .45s cubic-bezier(.22,.61,.36,1), opacity .45s ease; }
+    #app-root.enter{ opacity:1; transform: translateX(0); }
+
+    /* Pointer-Events ausgeschaltet -> kann nie Klicken blockieren */
+    #app-loader{ position:fixed; inset:0; display:grid; place-items:center; background:rgba(0,0,0,.92); z-index:50; transition:opacity .3s ease; pointer-events:none; }
+    @media (prefers-color-scheme: light){ #app-loader{ background:rgba(255,255,255,.92);} }
+    .hub{ position:relative; width:140px; height:140px; }
+
+    .blade{ position:absolute; left:50%; top:50%; width:88px; height:18px; transform-origin: 10px 50%; border-radius: 999px; background: linear-gradient(145deg, rgba(255,255,255,0.35), rgba(255,255,255,0.08)); border:1px solid rgba(255,255,255,0.55); box-shadow: 0 10px 22px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.65), inset 0 -1px 0 rgba(255,255,255,.25); }
+    .blade.main{ transition: transform .14s steps(1,end); transform: translate(-50%, -50%) rotate(270deg); }
+    .blade.ghost{ pointer-events:none; opacity:0.55; filter: blur(1px); transition: transform .5s cubic-bezier(.22,.61,.36,1), opacity .55s ease; }
+
+    .appbar{ backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); background: linear-gradient(180deg, rgba(255,255,255,.68), rgba(255,255,255,.48)); border: 1px solid rgba(228,228,231,.6); box-shadow: 0 8px 24px rgba(0,0,0,.06); margin: 8px; margin-top: calc(env(safe-area-inset-top) + 8px); }
+    @media (prefers-color-scheme: dark){ .appbar{ background: linear-gradient(180deg, rgba(24,24,27,.55), rgba(24,24,27,.35)); border-color: rgba(63,63,70,.6); box-shadow: 0 8px 24px rgba(0,0,0,.35);} }
+
+    .logo{ font-weight: 900; letter-spacing: .04em; line-height: 1; text-shadow: 0 10px 26px rgba(0,0,0,.3); }
+    @media (prefers-color-scheme: dark){ .logo{ text-shadow: 0 10px 26px rgba(0,0,0,.45); } }
+    .logo-icon{ width: 28px; height: 28px; flex-shrink:0; display:inline-block; background: linear-gradient(145deg, rgba(255,255,255,0.5), rgba(255,255,255,0.2)); border: 1px solid rgba(255,255,255,0.4); border-radius: 50%; position: relative; box-shadow: inset 0 0 4px rgba(255,255,255,0.5), 0 2px 6px rgba(0,0,0,0.15); }
+    .logo-icon::before{ content: ""; position:absolute; inset:4px; border: 2px solid rgba(0,0,0,0.5); border-radius:50%; }
+    .logo-icon::after{ content: "€"; position:absolute; font-size:14px; color:rgba(0,0,0,0.65); top:50%; left:50%; transform:translate(-50%, -50%); }
+    @media (prefers-color-scheme: dark){ .logo-icon{ background: linear-gradient(145deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); border-color: rgba(255,255,255,0.15);} .logo-icon::before{ border-color: rgba(255,255,255,0.4);} .logo-icon::after{ color: rgba(255,255,255,0.8);} }
+  </style>
+</head>
+<body class="min-h-screen">
+  <div id="app-loader">
+    <div id="hub" class="hub">
+      <div class="blade main"></div>
+    </div>
+  </div>
+
+  <main id="app-root" class="mx-auto min-h-screen max-w-[var(--maxw)] p-3 relative">
+    <header class="sticky top-0 z-10 mb-3 rounded-3xl appbar p-3">
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <button id="backBtn" aria-label="Zurück" class="hidden h-9 w-9 shrink-0 grid place-items-center rounded-2xl border border-zinc-300/60 text-zinc-700 dark:border-zinc-700/60 dark:text-zinc-200">←</button>
+          <div class="flex items-center gap-2">
+            <span class="logo-icon"></span>
+            <div class="logo text-3xl tracking-wide text-zinc-900 dark:text-zinc-100">Tikker</div>
+          </div>
+        </div>
+        <div class="relative">
+          <button id="unitBtn" class="rounded-2xl border border-zinc-300/60 px-3 py-1.5 text-sm dark:border-zinc-700/60 bg-white/40 dark:bg-zinc-900/30">g ▾</button>
+        </div>
+      </div>
+    </header>
+
+    <div id="views">
+      <section id="view-home">
+        <div class="grid grid-cols-2 gap-3">
+          <button class="tile card p-3 text-left" onclick="setView('a')">
+            <div class="mt-1 text-sm font-semibold">Für Kunden</div>
+            <div class="text-xs muted">Budget + Preis → Menge</div>
+          </button>
+          <button class="tile card p-3 text-left" onclick="setView('b')">
+            <div class="mt-1 text-sm font-semibold">Für Tikker</div>
+            <div class="text-xs muted">Menge + Preis → Gesamt</div>
+          </button>
+          <button class="tile card p-3 text-left" onclick="setView('c')">
+            <div class="mt-1 text-sm font-semibold">Kurs-Rechner</div>
+            <div class="text-xs muted">Budget + Menge → max €/Einheit</div>
+          </button>
+          <button class="tile card p-3 text-left" onclick="setView('d')">
+            <div class="mt-1 text-sm font-semibold">Zeit-Rechner</div>
+            <div class="text-xs muted">Konsum & Kosten (g/Tag × Tage/Woche × €/g)</div>
+          </button>
+          <button class="col-span-2 card p-3 text-left flex items-center justify-between" onclick="setView('k')">
+            <div>
+              <div class="text-base font-semibold">K Liste</div>
+              <div class="text-xs muted">Name, Datum, Stückzahl, Schulden, Anmerkungen</div>
+            </div>
+            <div class="text-xl">›</div>
+          </button>
+        </div>
+        <p class="mt-4 text-center text-xs muted">Dezimal mit Komma (0,5). Dark Mode automatisch.</p>
+      </section>
+    </div>
+  </main>
+
+  <script>
+  (function(){
+    "use strict";
+    var loader = document.getElementById('app-loader');
+    var hub = document.getElementById('hub');
+    var blade = hub ? hub.querySelector('.blade.main') : null;
+    var app = document.getElementById('app-root');
+
+    function showApp(){ if(app) app.classList.add('enter'); }
+    function hideLoader(){
+      if (!loader) { showApp(); return; }
+      loader.style.opacity = '0';
+      setTimeout(function(){ if(loader && loader.parentNode) loader.parentNode.removeChild(loader); }, 200);
+      showApp();
+    }
+
+    function startLoader(){
+      if (!blade || !hub){ hideLoader(); return; }
+      var TICK = 130;
+      var prev = 270;
+      function setDeg(d){ blade.style.transform = 'translate(-50%, -50%) rotate(' + d + 'deg)'; }
+      function ghost(d){
+        var g = blade.cloneNode(false);
+        g.classList.remove('main'); g.classList.add('ghost');
+        g.style.transform = 'translate(-50%, -50%) rotate(' + d + 'deg)';
+        hub.appendChild(g);
+        requestAnimationFrame(function(){
+          g.style.transform = 'translate(-50%, -50%) rotate(' + d + 'deg) translateX(82px)';
+          g.style.opacity = '0';
+        });
+        setTimeout(function(){ if(g && g.parentNode) g.parentNode.removeChild(g); }, 500);
+      }
+      setDeg(prev);
+      var steps = [0,90,180,270,0,90,180];
+      var i = 0;
+      var timer = setInterval(function(){
+        ghost(prev);
+        setDeg(steps[i]);
+        prev = steps[i];
+        i++;
+        if(i >= steps.length){ clearInterval(timer); setTimeout(hideLoader, 120); }
+      }, TICK);
+    }
+
+    // --- iOS-Hard-Fixes ---
+    // 1) Failsafe nach 1200ms
+    var failsafe = setTimeout(hideLoader, 1200);
+    // 2) Erster Touch/Scroll/VisibilityChange blendet Loader sofort aus
+    ['touchstart','click','scroll','visibilitychange','orientationchange'].forEach(function(evt){
+      document.addEventListener(evt, hideLoader, { once: true, passive: true });
+    });
+    // 3) Start sofort
+    try { startLoader(); } catch(e){ hideLoader(); }
+    // 4) Falls normal beendet, Failsafe canceln
+    setTimeout(function(){ clearTimeout(failsafe); }, 1400);
+
+    // Dummy setView, damit Buttons funktionieren in dieser Kurzdatei
+    window.setView = function(){ return true; };
+  })();
+  </script>
+</body>
+</html>
